@@ -226,11 +226,6 @@ void draw_plane(float *pvm)
     pvr_vertex_commit_zclip(poly, 4);
 }
 
-/* romdisk */
-extern uint8 romdisk_boot[];
-KOS_INIT_FLAGS(INIT_DEFAULT);
-KOS_INIT_ROMDISK(romdisk_boot);
-
 int main(void)
 {
     pvr_init_params_t params = {

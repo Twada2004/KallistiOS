@@ -1,36 +1,23 @@
-all: rm-elf example.elf
+TARGET = example.elf
+OBJS = example.o pvr_zclip.o romdisk.o
+KOS_ROMDISK_DIR = romdisk
+
+all: rm-elf $(TARGET)
 
 include $(KOS_BASE)/Makefile.rules
 
-OBJS = example.o pvr_zclip.o
-
-KOS_LOCAL_CFLAGS = -I$(KOS_BASE)/addons/zlib
-	
-clean:
-	-rm -f example.elf $(OBJS)
-	-rm -f romdisk_boot.*
-
-dist:
+clean: rm-elf
 	-rm -f $(OBJS)
-	-rm -f romdisk_boot.*
-	$(KOS_STRIP) example.elf
-	
+
 rm-elf:
-	-rm -f example.elf
-	-rm -f romdisk_boot.*
+	-rm -f $(TARGET) romdisk.*
 
-example.elf: $(OBJS) romdisk_boot.o 
-	$(KOS_CC) $(KOS_CFLAGS) $(KOS_LDFLAGS) -g -o $@ $(KOS_START) $^ -lm -lpng -lz $(KOS_LIBS)
+$(TARGET): $(OBJS)
+	kos-cc -o $(TARGET) $(OBJS) -lpng -lz
 
-romdisk_boot.img:
-	$(KOS_GENROMFS) -f $@ -d romdisk_boot -v
+run: $(TARGET)
+	$(KOS_LOADER) $(TARGET)
 
-romdisk_boot.o: romdisk_boot.img
-	$(KOS_BASE)/utils/bin2o/bin2o $< romdisk_boot $@
-
-run: example.elf
-	$(KOS_LOADER) $<
-
-
-
-
+dist: $(TARGET)
+	-rm -f $(OBJS) romdisk.img
+	$(KOS_STRIP) $(TARGET)
