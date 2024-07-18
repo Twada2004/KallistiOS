@@ -6,5 +6,5 @@
 	return : Bytes sent.
  */
 extern int pvr_vertex_commit_zclip(pvr_vertex_t *vert, int size);
-extern int pvr_vertex_commit_zclip_intensty(pvr_vertex_t *vert, int size);
+extern int pvr_vertex_commit_zclip_intensity(pvr_vertex_t *vert, int size);
 extern int pvr_modifier_commit_zclip(pvr_mod_hdr_t *eol_header, pvr_modifier_vol_t *vol, int size);

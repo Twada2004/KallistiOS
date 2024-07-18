@@ -189,22 +189,92 @@ static void inter_vert_commit(pvr_vertex_t *dest, pvr_vertex_t *inside, pvr_vert
 
 static void inter_vert_commit_intensity(pvr_vertex_t *dest, pvr_vertex_t *inside, pvr_vertex_t *outside, int eos)
 {
-	unsigned int *flags = (unsigned int *)dest;
-	float *d = (float *)dest;
-	float *inside_color = (float *)&inside->argb;
-	float *outside_color = (float *)&outside->argb;
-	float inter = (inside->z - 1.0f) / (inside->z - outside->z);
-	*flags = (eos + 14) << 28;
-	d[1] = inter * (outside->x - inside->x) + inside->x;
-	d[2] = inter * (outside->y - inside->y) + inside->y;
-	d[3] = 1.0f;
-	d[4] = inter * (outside->u * outside->z - inside->u * inside->z) + inside->u * inside->z;
-	d[5] = inter * (outside->v * outside->z - inside->v * inside->z) + inside->v * inside->z;
-	d[6] = inter * (outside_color[0] * outside->z - inside_color[0] * inside->z) + inside_color[0] * inside->z;
-	d[7] = inter * (outside_color[1] * outside->z - inside_color[1] * inside->z) + inside_color[1] * inside->z;
-	asm("pref @%0"
-		:
-		: "r"(dest));
+	asm volatile(
+		"fschg\n\t"
+
+		"add	#8, %[i]\n\t"
+		"add	#8, %[o]\n\t"
+		"fmov.d	@%[i]+, dr2\n\t"
+		"fmov.d	@%[i]+, dr4\n\t"
+		"fmov.d	@%[i]+, dr6\n\t"
+		"fmov.d	@%[o]+, dr8\n\t"
+		"fmov.d	@%[o]+, dr10\n\t"
+		"fmov.d	@%[o]+, dr12\n\t"
+
+		"fmul	fr3, fr4\n\t"
+		"add	#32, %[d]\n\t"
+		"fmul	fr3, fr5\n\t"
+		"add	#-32, %[i]\n\t"
+		"fmul	fr3, fr6\n\t"
+		"add	#-32, %[o]\n\t"
+		"fmul	fr3, fr7\n\t"
+		"fcmp/gt fr9, fr3\n\t"
+		"fmul	fr9, fr10\n\t"
+		"fldi1	fr0\n\t"
+		"fmul	fr9, fr11\n\t"
+		"fneg	fr0\n\t"
+		"fmul	fr9, fr12\n\t"
+		"fmul	fr9, fr13\n\t"
+
+		"fadd	fr3, fr0\n\t"
+		"fsub	fr9, fr3\n\t"
+		"fmul	fr3, fr3\n\t"
+		"bt/s	1f\n\t"
+		"fsrra	fr3\n\t"
+		"fneg	fr3\n\t"
+		"1:\n\t"
+		"fmul	fr3, fr0\n\t"
+
+		"fsub	fr4, fr10\n\t"
+		"add	#14, %[e]\n\t"
+		"fsub	fr5, fr11\n\t"
+		"shld	%[shift], %[e]\n\t"
+		"fsub	fr6, fr12\n\t"
+		"lds	%[e], fpul\n\t"
+		"fsub	fr7, fr13\n\t"
+		"fmac	fr0, fr10, fr4\n\t"
+		"fmac	fr0, fr11, fr5\n\t"
+		"fmac	fr0, fr12, fr6\n\t"
+		"fmac	fr0, fr13, fr7\n\t"
+
+		"fmov.d	dr6, @-%[d]\n\t"
+		"fmov.d	dr4, @-%[d]\n\t"
+
+		"fmov.d	@%[i]+, dr4\n\t"
+		"fmov.d @%[o]+, dr6\n\t"
+		"fsts	fpul, fr4\n\t"
+
+		"fsub	fr2, fr8\n\t"
+		"fsub	fr5, fr7\n\t"
+		"fmac	fr0, fr8, fr2\n\t"
+		"fmac	fr0, fr7, fr5\n\t"
+		"fldi1	fr3\n\t"
+
+		"fmov.d	dr2, @-%[d]\n\t"
+		"fmov.d	dr4, @-%[d]\n\t"
+
+		"pref	@%[d]\n\t"
+		"fschg\n"
+		: [d] "+&r"(dest), [i] "+&r"(inside), [o] "+&r"(outside), [e] "+r"(eos)
+		: [shift] "r"(28)
+		: "fpul", "fr0", "fr1", "fr2", "fr3", "fr4", "fr5", "fr6", "fr7", "fr8", "fr9", "fr10", "fr11", "fr12", "fr13");
+
+	// unsigned int *flags = (unsigned int *)dest;
+	// float *d = (float *)dest;
+	// float *inside_color = (float *)&inside->argb;
+	// float *outside_color = (float *)&outside->argb;
+	// float inter = (inside->z - 1.0f) / (inside->z - outside->z);
+	// *flags = (eos + 14) << 28;
+	// d[1] = inter * (outside->x - inside->x) + inside->x;
+	// d[2] = inter * (outside->y - inside->y) + inside->y;
+	// d[3] = 1.0f;
+	// d[4] = inter * (outside->u * outside->z - inside->u * inside->z) + inside->u * inside->z;
+	// d[5] = inter * (outside->v * outside->z - inside->v * inside->z) + inside->v * inside->z;
+	// d[6] = inter * (outside_color[0] * outside->z - inside_color[0] * inside->z) + inside_color[0] * inside->z;
+	// d[7] = inter * (outside_color[1] * outside->z - inside_color[1] * inside->z) + inside_color[1] * inside->z;
+	// asm("pref @%0"
+	// 	:
+	// 	: "r"(dest));
 }
 
 int pvr_vertex_commit_zclip(pvr_vertex_t *src, int size)
