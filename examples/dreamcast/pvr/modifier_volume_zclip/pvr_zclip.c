@@ -282,6 +282,7 @@ int pvr_vertex_commit_zclip(pvr_vertex_t *src, int size)
 	pvr_vertex_t *dest = (pvr_vertex_t *)SQ_MASK_DEST((void *)PVR_TA_INPUT);
 	pvr_vertex_t *top = dest;
 	sq_lock((void *)PVR_TA_INPUT);
+	src = (pvr_vertex_t *)&src->flags;
 	for (int strip_num = 2; size; size -= strip_num)
 	{
 		int clip = 0;
@@ -379,6 +380,7 @@ int pvr_vertex_commit_zclip_intensity(pvr_vertex_t *src, int size)
 	pvr_vertex_t *dest = (pvr_vertex_t *)SQ_MASK_DEST((void *)PVR_TA_INPUT);
 	pvr_vertex_t *top = dest;
 	sq_lock((void *)PVR_TA_INPUT);
+	src = (pvr_vertex_t *)&src->flags;
 	for (int strip_num = 2; size; size -= strip_num)
 	{
 		int clip = 0;
@@ -474,7 +476,7 @@ int pvr_vertex_commit_zclip_intensity(pvr_vertex_t *src, int size)
 static void *modi_commit(void *dest, pvr_mod_hdr_t *header, pvr_modifier_vol_t *vol, int eol)
 {
 	unsigned int *d = dest;
-	unsigned int *s = (unsigned int *)vol;
+	unsigned int *s = (unsigned int *)&vol->flags;
 	static int first = 1;
 	if (first)
 	{
@@ -606,7 +608,7 @@ static inline void inter_vert(float *dest3f, float in_x, float in_y, float in_z,
 
 int pvr_modifier_commit_zclip(pvr_mod_hdr_t *eol_header, pvr_modifier_vol_t *vol, int size)
 {
-	__attribute__((aligned(32))) static pvr_modifier_vol_t buf = {
+	pvr_modifier_vol_t buf = {
 		PVR_CMD_VERTEX_EOL,
 		0.0f, 0.0f, 0.0f, /* 1st cover vertex */
 		0.0f, 0.0f, 0.0f, /* 2nd cover vertex */
@@ -617,6 +619,7 @@ int pvr_modifier_commit_zclip(pvr_mod_hdr_t *eol_header, pvr_modifier_vol_t *vol
 	float cover[3]; /* 3rd cover vertex */
 	int cover_flag = 0;
 	sq_lock((void *)PVR_TA_INPUT);
+	vol = (pvr_modifier_vol_t *)&vol->flags;
 	for (int i = size; i; i--, vol++)
 	{
 		if (1.0f >= vol->az && vol->az > 0.0f)

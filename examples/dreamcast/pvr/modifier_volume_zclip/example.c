@@ -11,7 +11,7 @@ pvr_ptr_t box_tex;
 
 void mul_screen(float width, float height)
 {
-    __attribute__((aligned(32))) static matrix_t d = {
+    matrix_t d = {
         {1.0f, 0.0f, 0.0f, 0.0f},
         {0.0f, 1.0f, 0.0f, 0.0f},
         {0.0f, 0.0f, 1.0f, 0.0f},
@@ -25,7 +25,7 @@ void mul_screen(float width, float height)
 
 void mul_projection(float fov, float aspect, float znear)
 {
-    __attribute__((aligned(32))) static matrix_t d = {
+    matrix_t d = {
         {1.0f, 0.0f, 0.0f, 0.0f},
         {0.0f, 1.0f, 0.0f, 0.0f},
         {0.0f, 0.0f, 1.0f, 0.0f},
@@ -42,7 +42,7 @@ void mul_projection(float fov, float aspect, float znear)
 
 void draw_modifier(float *pvm)
 {
-    __attribute__((aligned(32))) static pvr_modifier_vol_t vol[12] = {
+    pvr_modifier_vol_t vol[12] = {
         {PVR_CMD_VERTEX_EOL, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0, 0, 0, 0, 0, 0},
         {PVR_CMD_VERTEX_EOL, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0, 0, 0, 0, 0, 0},
         {PVR_CMD_VERTEX_EOL, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0, 0, 0, 0, 0, 0},
@@ -118,7 +118,7 @@ void draw_modifier(float *pvm)
 
 void draw_box(float *pvm)
 {
-    __attribute__((aligned(32))) static pvr_vertex_t poly[18] = {
+    pvr_vertex_t poly[18] = {
         {PVR_CMD_VERTEX, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0xffffffff, 0x00000000},
         {PVR_CMD_VERTEX, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0xffffffff, 0x00000000},
         {PVR_CMD_VERTEX, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0xffffffff, 0x00000000},
