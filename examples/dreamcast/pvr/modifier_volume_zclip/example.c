@@ -1,4 +1,11 @@
-/* Modifier volume and Zclipping example for KOS 2.1.x
+/*
+ * KallistiOS ##version##
+ *
+ * examples/dreamcast/pvr/modifier_volume_zclip/example.c
+ * Copyright (C) 2024 Twada
+ *
+ * This example demonstrates how to perform Z-clipping on modifier volumes.
+ */
  * by Twada
  */
 #include <kos.h>
@@ -7,9 +14,9 @@
 #include "pvr_zclip.h"
 
 /* textures */
-pvr_ptr_t box_tex;
+static pvr_ptr_t box_tex;
 
-void mul_screen(float width, float height)
+static void mul_screen(float width, float height)
 {
     matrix_t d = {
         {1.0f, 0.0f, 0.0f, 0.0f},
@@ -23,7 +30,7 @@ void mul_screen(float width, float height)
     mat_apply(&d);
 }
 
-void mul_projection(float fov, float aspect, float znear)
+static void mul_projection(float fov, float aspect, float znear)
 {
     matrix_t d = {
         {1.0f, 0.0f, 0.0f, 0.0f},
@@ -40,7 +47,7 @@ void mul_projection(float fov, float aspect, float znear)
     mat_apply(&d);
 }
 
-void draw_modifier(float *pvm)
+static void draw_modifier(float *pvm)
 {
     pvr_modifier_vol_t vol[12] = {
         {PVR_CMD_VERTEX_EOL, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0, 0, 0, 0, 0, 0},
@@ -116,7 +123,7 @@ void draw_modifier(float *pvm)
     pvr_modifier_commit_zclip(&hdr, vol, 12);
 }
 
-void draw_box(float *pvm)
+static void draw_box(float *pvm)
 {
     pvr_vertex_t poly[18] = {
         {PVR_CMD_VERTEX, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0xffffffff, 0x00000000},
@@ -193,11 +200,11 @@ void draw_box(float *pvm)
     pvr_vertex_commit_zclip(poly, 18);
 }
 
-void draw_plane(float *pvm)
+static void draw_plane(float *pvm)
 {
     pvr_poly_cxt_t cxt;
     pvr_poly_hdr_t hdr;
-    __attribute__((aligned(32))) static pvr_vertex_t poly[4] = {
+    static pvr_vertex_t poly[4] = {
         {PVR_CMD_VERTEX, 0.0f, 100.0f, 0.5f, 0.0f, 1.0f, 0xffff0000, 0x00000000},
         {PVR_CMD_VERTEX, 0.0f, 0.0f, 0.5f, 0.0f, 0.0f, 0xff00ff00, 0x00000000},
         {PVR_CMD_VERTEX, 100.0f, 100.0f, 0.5f, 1.0f, 1.0f, 0xff0000ff, 0x00000000},

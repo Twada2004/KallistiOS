@@ -1,3 +1,13 @@
+/*
+ * KallistiOS ##version##
+ *
+ * examples/dreamcast/pvr/modifier_volume_zclip/pvr_zclip.h
+ * Copyright (C) 2024 Twada
+ *
+ * This file contains the public API for commonly-used Z-clipping routines for
+ * modifier volumes. 
+ */
+
 #include <kos.h>
 
 /*
