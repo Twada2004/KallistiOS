@@ -5,7 +5,7 @@
  * Copyright (C) 2024 Twada
  *
  * This example demonstrates how to perform Z-clipping on modifier volumes.
- */
+ *
  * by Twada
  */
 #include <kos.h>
@@ -47,7 +47,7 @@ static void mul_projection(float fov, float aspect, float znear)
     mat_apply(&d);
 }
 
-static void draw_modifier(float *pvm)
+static void draw_modifier(matrix_t *pvm)
 {
     pvr_modifier_vol_t vol[12] = {
         {PVR_CMD_VERTEX_EOL, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0, 0, 0, 0, 0, 0},
@@ -63,47 +63,45 @@ static void draw_modifier(float *pvm)
         {PVR_CMD_VERTEX_EOL, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0, 0, 0, 0, 0, 0},
         {PVR_CMD_VERTEX_EOL, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0, 0, 0, 0, 0, 0},
     };
-    float vert[8][4] = {
-        {-1.0f, -1.0f, 1.0f, 1.0f},
-        {-1.0f, -1.0f, -1.0f, 1.0f},
-        {1.0f, -1.0f, 1.0f, 1.0f},
-        {1.0f, -1.0f, -1.0f, 1.0f},
-        {-1.0f, 1.0f, 1.0f, 1.0f},
-        {-1.0f, 1.0f, -1.0f, 1.0f},
-        {1.0f, 1.0f, 1.0f, 1.0f},
-        {1.0f, 1.0f, -1.0f, 1.0f},
+    float vert[8][3] = {
+        {-1.0f, -1.0f, 1.0f},
+        {-1.0f, -1.0f, -1.0f},
+        {1.0f, -1.0f, 1.0f},
+        {1.0f, -1.0f, -1.0f},
+        {-1.0f, 1.0f, 1.0f},
+        {-1.0f, 1.0f, -1.0f},
+        {1.0f, 1.0f, 1.0f},
+        {1.0f, 1.0f, -1.0f},
     };
-    float transform[8][4];
+    float transform[8][3];
     int index[12][3] = {
-        {0, 1, 2}, /* Bottom */
-        {2, 1, 3},
+        {1, 0, 3}, /* Bottom */
+        {0, 3, 2},
         {4, 5, 6}, /* Top */
-        {6, 5, 7},
+        {5, 6, 7},
         {0, 4, 2}, /* Front */
-        {2, 4, 6},
+        {4, 2, 6},
         {2, 6, 3}, /* Right */
-        {3, 6, 7},
-        {1, 5, 3}, /* Back */
-        {3, 5, 7},
+        {6, 3, 7},
+        {3, 7, 1}, /* Back */
+        {7, 1, 5},
         {1, 5, 0}, /* Left */
-        {0, 5, 4}};
+        {5, 0, 4}};
     pvr_mod_hdr_t hdr;
     static float ry = 0.0f;
     /* Vertex transform */
     ry += 0.01;
     mat_identity();
-    mat_apply((matrix_t *)pvm);
+    mat_apply(pvm);
     mat_translate(-1.0f, 0.25f, 1.0f);
     mat_rotate(0.0f, ry, 0.0f);
     mat_scale(2.0f, 2.0f, 2.0f);
     for (int i = 0; i < 8; i++)
     {
-        float tmp[4] = {vert[i][0], vert[i][1], vert[i][2], vert[i][3]};
-        mat_trans_nodiv(tmp[0], tmp[1], tmp[2], tmp[3]);
-        transform[i][0] = tmp[0] / tmp[3];
-        transform[i][1] = tmp[1] / tmp[3];
-        transform[i][2] = tmp[2] / tmp[3];
-        transform[i][3] = 1.0f;
+        transform[i][0] = vert[i][0];
+        transform[i][1] = vert[i][1];
+        transform[i][2] = vert[i][2];
+        mat_trans_single3(transform[i][0], transform[i][1], transform[i][2]);
     }
     /* Face set */
     for (int i = 0; i < 12; i++)
@@ -123,7 +121,7 @@ static void draw_modifier(float *pvm)
     pvr_modifier_commit_zclip(&hdr, vol, 12);
 }
 
-static void draw_box(float *pvm)
+static void draw_box(matrix_t *pvm)
 {
     pvr_vertex_t poly[18] = {
         {PVR_CMD_VERTEX, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0xffffffff, 0x00000000},
@@ -145,17 +143,17 @@ static void draw_box(float *pvm)
         {PVR_CMD_VERTEX, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0xffffffff, 0x00000000},
         {PVR_CMD_VERTEX, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0xffffffff, 0x00000000},
     };
-    float vert[8][4] = {
-        {-1.0f, -1.0f, 1.0f, 1.0f},
-        {-1.0f, -1.0f, -1.0f, 1.0f},
-        {1.0f, -1.0f, 1.0f, 1.0f},
-        {1.0f, -1.0f, -1.0f, 1.0f},
-        {-1.0f, 1.0f, 1.0f, 1.0f},
-        {-1.0f, 1.0f, -1.0f, 1.0f},
-        {1.0f, 1.0f, 1.0f, 1.0f},
-        {1.0f, 1.0f, -1.0f, 1.0f},
+    float vert[8][3] = {
+        {-1.0f, -1.0f, 1.0f},
+        {-1.0f, -1.0f, -1.0f},
+        {1.0f, -1.0f, 1.0f},
+        {1.0f, -1.0f, -1.0f},
+        {-1.0f, 1.0f, 1.0f},
+        {-1.0f, 1.0f, -1.0f},
+        {1.0f, 1.0f, 1.0f},
+        {1.0f, 1.0f, -1.0f},
     };
-    float transform[8][4];
+    float transform[8][3];
     int index[18] = {
         1, 0, 3, -2,
         4, 5, 6, -7,
@@ -164,17 +162,15 @@ static void draw_box(float *pvm)
     pvr_poly_hdr_t hdr;
     /* Vertex transform */
     mat_identity();
-    mat_apply((matrix_t *)pvm);
+    mat_apply(pvm);
     mat_translate(1.0f, 2.0f, -1.0f);
     mat_scale(2.0f, 2.0f, 2.0f);
     for (int i = 0; i < 8; i++)
     {
-        float tmp[4] = {vert[i][0], vert[i][1], vert[i][2], vert[i][3]};
-        mat_trans_nodiv(tmp[0], tmp[1], tmp[2], tmp[3]);
-        transform[i][0] = tmp[0] / tmp[3];
-        transform[i][1] = tmp[1] / tmp[3];
-        transform[i][2] = tmp[2] / tmp[3];
-        transform[i][3] = 1.0f;
+        transform[i][0] = vert[i][0];
+        transform[i][1] = vert[i][1];
+        transform[i][2] = vert[i][2];
+        mat_trans_single3(transform[i][0], transform[i][1], transform[i][2]);
     }
     /* Face set */
     for (int i = 0; i < 18; i++)
@@ -200,31 +196,30 @@ static void draw_box(float *pvm)
     pvr_vertex_commit_zclip(poly, 18);
 }
 
-static void draw_plane(float *pvm)
+static void draw_plane(matrix_t *pvm)
 {
     pvr_poly_cxt_t cxt;
     pvr_poly_hdr_t hdr;
-    static pvr_vertex_t poly[4] = {
-        {PVR_CMD_VERTEX, 0.0f, 100.0f, 0.5f, 0.0f, 1.0f, 0xffff0000, 0x00000000},
-        {PVR_CMD_VERTEX, 0.0f, 0.0f, 0.5f, 0.0f, 0.0f, 0xff00ff00, 0x00000000},
-        {PVR_CMD_VERTEX, 100.0f, 100.0f, 0.5f, 1.0f, 1.0f, 0xff0000ff, 0x00000000},
-        {PVR_CMD_VERTEX_EOL, 100.0f, 0.0f, 0.5f, 1.0f, 0.0f, 0xffffffff, 0x00000000},
+    pvr_vertex_t poly[4] = {
+        {PVR_CMD_VERTEX, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0xffff0000, 0x00000000},
+        {PVR_CMD_VERTEX, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0xff00ff00, 0x00000000},
+        {PVR_CMD_VERTEX, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0xff0000ff, 0x00000000},
+        {PVR_CMD_VERTEX_EOL, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0xffffffff, 0x00000000},
     };
-    float vert[4][4] = {
-        {-5.0f, 0.0f, 5.0f, 1.0f},
-        {-5.0f, 0.0f, -5.0f, 1.0f},
-        {5.0f, 0.0f, 5.0f, 1.0f},
-        {5.0f, 0.0f, -5.0f, 1.0f}};
+    float vert[4][3] = {
+        {-5.0f, 0.0f, 5.0f},
+        {-5.0f, 0.0f, -5.0f},
+        {5.0f, 0.0f, 5.0f},
+        {5.0f, 0.0f, -5.0f}};
     int i;
     mat_identity();
-    mat_apply((matrix_t *)pvm);
+    mat_apply(pvm);
     for (i = 0; i < 4; i++)
     {
-        float tmp[4] = {vert[i][0], vert[i][1], vert[i][2], vert[i][3]};
-        mat_trans_nodiv(tmp[0], tmp[1], tmp[2], tmp[3]);
-        poly[i].x = tmp[0] / tmp[3];
-        poly[i].y = tmp[1] / tmp[3];
-        poly[i].z = tmp[2] / tmp[3];
+        poly[i].x = vert[i][0];
+        poly[i].y = vert[i][1];
+        poly[i].z = vert[i][2];
+        mat_trans_single3(poly[i].x, poly[i].y, poly[i].z);
     }
     pvr_poly_cxt_col(&cxt, PVR_LIST_OP_POLY);
     pvr_poly_compile(&hdr, &cxt);
@@ -244,7 +239,7 @@ int main(void)
         .autosort_disabled = 0,        /* Translucent Autosort enabled. */
         .opb_overflow_count = 3        /* Extra OPBs */
     };
-    static float cam_pvm[16];
+    matrix_t cam_pvm;
     point_t cam_pos = {0.0f, 0.0f, 1.0f, 1.0f};
     point_t cam_tar = {0.0f, 0.0f, 0.0f, 1.0f};
     point_t cam_up = {0.0f, 1.0f, 0.0f, 1.0f};
@@ -256,8 +251,8 @@ int main(void)
     /* init kos  */
     pvr_init(&params);
     pvr_set_bg_color(0, 0.5f, 1.0f);
-    /* (cheap_shadow << 8) | (int)(intensity * 255) */
-    PVR_SET(PVR_CHEAP_SHADOW, 0x00000180);
+    /* Enable cheap shadow */
+    pvr_set_shadow_scale(1, 0.5f);
 
     /* init plane */
     box_tex = pvr_mem_malloc(256 * 256 * 2);
@@ -289,18 +284,18 @@ int main(void)
         mul_screen(640.0f, 480.0f);
         mul_projection((3.14159265f / 3.0f), (640.0f / 480.0f), 0.125f);
         mat_lookat(&cam_pos, &cam_tar, &cam_up);
-        mat_store((matrix_t *)cam_pvm);
+        mat_store(&cam_pvm);
 
         pvr_wait_ready();
         pvr_scene_begin();
 
         pvr_list_begin(PVR_LIST_OP_POLY);
-        draw_plane(cam_pvm);
-        draw_box(cam_pvm);
+        draw_plane(&cam_pvm);
+        draw_box(&cam_pvm);
         pvr_list_finish();
 
         pvr_list_begin(PVR_LIST_OP_MOD);
-        draw_modifier(cam_pvm);
+        draw_modifier(&cam_pvm);
         pvr_list_finish();
 
         pvr_scene_finish();
