@@ -228,7 +228,7 @@ static void draw_plane(matrix_t *pvm)
     pvr_vertex_commit_zclip(poly, 4);
 }
 
-int main(void)
+int main(int argc, char* argv[])
 {
     pvr_init_params_t params = {
         /* Enable opaque and translucent polygons with size 16 */
