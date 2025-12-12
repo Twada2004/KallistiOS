@@ -6,9 +6,10 @@
 
 #include <dc/sci.h>
 #include <dc/math.h>
+#include <arch/arch.h>
 #include <arch/cache.h>
 #include <arch/dmac.h>
-#include <arch/timer.h>
+#include <kos/timer.h>
 
 #include <kos/dbglog.h>
 #include <kos/regfield.h>
@@ -333,14 +334,15 @@ sci_result_t sci_init(uint32_t baud_rate, sci_mode_t mode, sci_clock_t clock_src
     else if(mode == SCI_MODE_SPI) {
         /* Use 512 bytes DMA buffer for SPI operations by default,
             because it's sector size of SD cards. */
-#ifdef __DREAMCAST__
-        /* On Dreamcast, we use GPIO for CS (anyway need soldering all pins),
-           because RTS can be used for VS-link cable */
-        sci_configure_spi(SCI_SPI_CS_GPIO, 512);
-#else
-        /* On Naomi, we use SCIF RTS for CS, because no GPIO pins on CN1 connector */
-        sci_configure_spi(SCI_SPI_CS_RTS, 512);
-#endif
+        if(hardware_sys_mode(NULL) == HW_TYPE_RETAIL) {
+            /* On Dreamcast, we use GPIO for CS (anyway need soldering all pins),
+               because RTS can be used for VS-link cable */
+            sci_configure_spi(SCI_SPI_CS_GPIO, 512);
+        }
+        else {
+            /* On NAOMI, we use SCIF RTS for CS, because no GPIO pins on CN1 connector */
+            sci_configure_spi(SCI_SPI_CS_RTS, 512);
+        }
         /* Set CA bit for 8-bit synchronous mode */
         scsmr1 |= SCSMR_CA;
     }
@@ -443,7 +445,7 @@ void sci_configure_spi(sci_spi_cs_mode_t cs, size_t buffer_size) {
     sci_shutdown_spi_cs();
 
     /* Allocate a single aligned buffer for both TX and RX DMA operations */
-    if (buffer_size > 0) {
+    if(buffer_size > 0) {
         if(spi_dma_buffer != NULL && spi_buffer_size != buffer_size) {
             free(spi_dma_buffer);
             spi_dma_buffer = NULL;
@@ -451,7 +453,7 @@ void sci_configure_spi(sci_spi_cs_mode_t cs, size_t buffer_size) {
         
         if(spi_dma_buffer == NULL) {
             spi_dma_buffer = aligned_alloc(32, buffer_size);
-            if (spi_dma_buffer == NULL) {
+            if(spi_dma_buffer == NULL) {
                 dbglog(DBG_ERROR, "SCI: Failed to allocate DMA buffer\n");
                 return;
             }
@@ -1075,7 +1077,7 @@ sci_result_t sci_spi_dma_write_data(const uint8_t *data, size_t len, dma_callbac
     if(callback == NULL) {
 
         result = sci_dma_wait_complete();
-        if (result != SCI_OK) {
+        if(result != SCI_OK) {
             return result;
         }
 

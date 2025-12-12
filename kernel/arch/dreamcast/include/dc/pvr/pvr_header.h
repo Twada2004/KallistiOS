@@ -18,8 +18,10 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include <sys/cdefs.h>
+#include <kos/cdefs.h>
 __BEGIN_DECLS
+
+#include <dc/pvr/pvr_regs.h>
 
 /** \defgroup pvr_primitives_headers Headers
     \brief                           Structs relative to PVR headers
@@ -214,7 +216,7 @@ typedef uint32_t pvr_txr_ptr_t;
     \return                 The pre-processed texture address
 */
 static inline pvr_txr_ptr_t to_pvr_txr_ptr(pvr_ptr_t addr) {
-    return ((uint32_t)addr & 0x00fffff8) >> 3;
+    return ((uint32_t)addr & (PVR_RAM_SIZE - 1)) >> 3;
 }
 
 /** \brief Get texture address form VRAM address

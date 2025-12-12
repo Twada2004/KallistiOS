@@ -9,7 +9,7 @@
 #ifndef __DC_CDROM_H
 #define __DC_CDROM_H
 
-#include <sys/cdefs.h>
+#include <kos/cdefs.h>
 __BEGIN_DECLS
 
 #include <arch/types.h>
@@ -350,17 +350,6 @@ int cdrom_get_status(int *status, int *disc_type);
 /** \brief    Change the datatype of disc.
     \ingroup  gdrom
 
-    \note                   This function is formally deprecated. It should not
-                            be used in any future code, and may be removed in
-                            the future. You should instead use
-                            cdrom_change_datatype.
-*/
-int cdrom_change_dataype(int sector_part, int cdxa, int sector_size)
-                        __depr("Use cdrom_change_datatype instead.");
-
-/** \brief    Change the datatype of disc.
-    \ingroup  gdrom
-
     This function will take in all parameters to pass to the change_datatype 
     syscall. This allows these parameters to be modified without a reinit. 
     Each parameter allows -1 as a default, which is tied to the former static 
@@ -406,13 +395,14 @@ int cdrom_reinit_ex(int sector_part, int cdxa, int sector_size);
 /** \brief    Read the table of contents from the disc.
     \ingroup  gdrom
 
-    This function reads the TOC from the specified session of the disc.
+    This function reads the TOC from the specified area of the disc.
+    On regular CD-ROMs, there are only low density area.
 
     \param  toc_buffer      Space to store the returned TOC in.
-    \param  session         The session of the disc to read.
+    \param  high_density    Whether to read from the high density area.
     \return                 \ref cd_cmd_response
 */
-int cdrom_read_toc(CDROM_TOC *toc_buffer, int session);
+int cdrom_read_toc(CDROM_TOC *toc_buffer, bool high_density);
 
 /** \brief    Read one or more sector from a CD-ROM.
     \ingroup  gdrom

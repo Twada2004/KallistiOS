@@ -15,7 +15,7 @@
 #include <arch/arch.h>
 #include <arch/types.h>
 #include <arch/irq.h>
-#include <arch/timer.h>
+#include <kos/timer.h>
 #include <arch/stack.h>
 #include <kos/dbgio.h>
 #include <kos/dbglog.h>
@@ -131,30 +131,31 @@ static char *irq_exception_string(irq_t evt) {
         case EXC_DATA_ADDRESS_WRITE:
             return "Data address error (write)";
         case EXC_DTLB_MISS_READ:  /* or EXC_ITLB_MISS */
-            return "Instruction or Data(read) TLB miss";  
-        case EXC_DTLB_MISS_WRITE:  
+            return "Instruction or Data(read) TLB miss";
+        case EXC_DTLB_MISS_WRITE:
             return "Data(write) TLB miss";
         case EXC_DTLB_PV_READ:  /* or EXC_ITLB_PV */
-            return "Instruction or Data(read) TLB protection violation";  
+            return "Instruction or Data(read) TLB protection violation";
         case EXC_DTLB_PV_WRITE:
             return "Data TLB protection violation (write)";
         case EXC_FPU:
             return "FPU exception";
-        case EXC_INITIAL_PAGE_WRITE:  
-            return "Initial page write exception";  
-        case EXC_TRAPA:  
-            return "Unconditional trap (trapa)"; 
+        case EXC_INITIAL_PAGE_WRITE:
+            return "Initial page write exception";
+        case EXC_TRAPA:
+            return "Unconditional trap (trapa)";
         case EXC_USER_BREAK_POST:  /* or EXC_USER_BREAK_PRE */
-            return "User break";  
-        default:  
+            return "User break";
+        default:
             return "Unknown exception";
     }
 }
 
 /* Print a kernel panic reg dump */
 extern irq_context_t *irq_srt_addr;
-static void irq_dump_regs(int code, irq_t evt) {
+void irq_dump_regs(int code, irq_t evt) {
     uint32_t fp;
+    uint32_t ret_addr;
     uint32_t *regs = irq_srt_addr->r;
     bool valid_pc;
     bool valid_pr;
@@ -168,17 +169,17 @@ static void irq_dump_regs(int code, irq_t evt) {
     dbglog(DBG_DEAD, " SR %08lx PR %08lx\n", irq_srt_addr->sr, irq_srt_addr->pr);
     fp = regs[14];
     arch_stk_trace_at(fp, 0);
-    
+
     if(code == 1) {
-        dbglog(DBG_DEAD, "\nEncountered %s. ", irq_exception_string(evt)); 
-        
+        dbglog(DBG_DEAD, "\nEncountered %s. ", irq_exception_string(evt));
+
         valid_pc = arch_valid_text_address(irq_srt_addr->pc);
         valid_pr = arch_valid_text_address(irq_srt_addr->pr);
         /* Construct template message only if either PC/PR address is valid */
         if(valid_pc || valid_pr) {
             dbglog(DBG_DEAD, "Use this template terminal command to help"
                 " diagnose:\n\n\t$KOS_ADDR2LINE -f -C -i -e prog.elf");
-            
+
             if(valid_pc)
                 dbglog(DBG_DEAD, " %08lx", irq_srt_addr->pc);
 
@@ -191,13 +192,13 @@ static void irq_dump_regs(int code, irq_t evt) {
                     break;
 
                 /* Get the return address from the function pointer */
-                fp = arch_fptr_ret_addr(fp);
+                ret_addr = arch_fptr_ret_addr(fp);
 
                 /* Validate the return address */
-                if(!arch_valid_text_address(fp))
+                if(!arch_valid_text_address(ret_addr))
                     break;
 
-                dbglog(DBG_DEAD, " %08lx", fp);
+                dbglog(DBG_DEAD, " %08lx", ret_addr);
                 fp = arch_fptr_next(fp);
             }
         }
@@ -215,21 +216,32 @@ void irq_handle_exception(int code) {
     uint32_t evt = 0;
     int handled = 0;
 
+    if(__is_defined(__SH_ATOMIC_MODEL_SOFT_GUSA__)
+       && __predict_false((int32_t)irq_srt_addr->r[15] >= -128
+                     && irq_srt_addr->pc != irq_srt_addr->r[0])) {
+        /* The stack pointer has been altered: it means we are in the middle of
+           an atomic section, and we need to roll-back.
+           The r0 register contains the address of the end of the section,
+           and the stack pointer contains the negated section size. */
+        irq_srt_addr->pc = irq_srt_addr->r[0] + irq_srt_addr->r[15];
+    }
+
     switch(code) {
-        /* If it's a code 0, well, we shouldn't be here. */
-        case 0:
-            arch_panic("spurious RESET exception");
-            break;
-
-        /* If it's a code 1 or 2, grab the event from expevt. */
-        case 1:
-        case 2:
-            evt = EXPEVT;
-            break;
-
         /* If it's a code 3, grab the event from intevt. */
         case 3:
             evt = INTEVT;
+            break;
+
+        /* If it's a code 1 or 2, grab the event from expevt. */
+        case 2:
+        case 1:
+            evt = EXPEVT;
+            break;
+
+        /* If it's a code 0, well, we shouldn't be here. */
+        case 0:
+        default:
+            arch_panic("spurious RESET exception");
             break;
     }
 
@@ -245,7 +257,7 @@ void irq_handle_exception(int code) {
         arch_panic("double fault");
     }
 
-    /* Reveal this info about the int to inside_int for better 
+    /* Reveal this info about the int to inside_int for better
        diagnostics returns if we try to do something in the int. */
     inside_int = ((code&0xf)<<16) | (evt&0xffff);
 
@@ -379,7 +391,7 @@ int irq_init(void) {
     /* Default to not in an interrupt */
     inside_int = 0;
 
-    /* Set a default timer handlers */
+    /* Set default timer handlers */
     irq_set_handler(EXC_TMU0_TUNI0, irq_def_timer, (void *)TMU0);
     irq_set_handler(EXC_TMU1_TUNI1, irq_def_timer, (void *)TMU1);
     irq_set_handler(EXC_TMU2_TUNI2, irq_def_timer, (void *)TMU2);
@@ -433,7 +445,7 @@ void irq_shutdown(void) {
 void irq_set_priority(irq_src_t src, unsigned int prio) {
     uint16_t ipr;
 
-    if (prio > IRQ_PRIO_MAX)
+    if(prio > IRQ_PRIO_MAX)
         prio = IRQ_PRIO_MAX;
 
     irq_disable_scoped();

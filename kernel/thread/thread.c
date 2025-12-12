@@ -4,7 +4,7 @@
    Copyright (C) 2000, 2001, 2002, 2003 Megan Potter
    Copyright (C) 2010, 2016, 2023 Lawrence Sebald
    Copyright (C) 2023 Colton Pawielski
-   Copyright (C) 2023, 2024 Falco Girgis
+   Copyright (C) 2023, 2024, 2025 Falco Girgis
 */
 
 #include <assert.h>
@@ -13,7 +13,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 #include <reent.h>
 #include <errno.h>
 #include <stdalign.h>
@@ -26,9 +25,10 @@
 #include <kos/cond.h>
 #include <kos/genwait.h>
 
-#include <arch/irq.h>
-#include <arch/timer.h>
 #include <arch/arch.h>
+#include <arch/irq.h>
+#include <arch/stack.h>
+#include <kos/timer.h>
 #include <arch/tls_static.h>
 
 /*
@@ -45,8 +45,8 @@ also using their queue library verbatim (sys/queue.h).
 */
 
 /* Builtin background thread data */
-static alignas(8) uint8_t thd_reaper_stack[512];
-static alignas(8) uint8_t thd_idle_stack[64];
+static alignas(THD_STACK_ALIGNMENT) uint8_t thd_reaper_stack[512];
+static alignas(THD_STACK_ALIGNMENT) uint8_t thd_idle_stack[64];
 
 /*****************************************************************************/
 /* Thread scheduler data */
@@ -361,14 +361,17 @@ int thd_remove_from_runnable(kthread_t *thd) {
 }
 
 /* New thread function; given a routine address, it will create a
-   new kernel thread with the given attributes. When the routine
-   returns, the thread will exit. Returns the new thread struct. */
+   new thread with the given attributes. When the routine returns,
+   the thread will exit. Returns the new thread struct.
+   Note that this function is also used in thd_init() to add the
+   already running kernel thread to the thread scheduler. This is
+   the only circumstance in which routine should be NULL. */
 kthread_t *thd_create_ex(const kthread_attr_t *restrict attr,
                          void *(*routine)(void *param), void *param) {
     kthread_t *nt = NULL;
     tid_t tid;
     uint32_t params[4];
-    kthread_attr_t real_attr = { false, THD_STACK_SIZE, NULL, PRIO_DEFAULT, NULL };
+    kthread_attr_t real_attr = { false, THD_STACK_SIZE, NULL, PRIO_DEFAULT, NULL, false };
 
     if(attr)
         real_attr = *attr;
@@ -404,7 +407,8 @@ kthread_t *thd_create_ex(const kthread_attr_t *restrict attr,
 
             /* Create a new thread stack */
             if(!real_attr.stack_ptr) {
-                nt->stack = (uint32_t*)malloc(real_attr.stack_size);
+                nt->stack = (uint32_t*)aligned_alloc(THD_STACK_ALIGNMENT,
+                                                     real_attr.stack_size);
 
                 if(!nt->stack) {
                     free(nt);
@@ -429,8 +433,17 @@ kthread_t *thd_create_ex(const kthread_attr_t *restrict attr,
                                ((uint32_t)nt->stack) + nt->stack_size,
                                (uint32_t)thd_birth, params, 0);
 
-            /* Create static TLS data */
-            if(!arch_tls_setup_data(nt)) {
+            /* Some architectures require setting up a new stack before use.
+               We won't do this if routine is NULL, however, as this means
+               we are creating the kernel thread, which is already running. */
+            if(routine) {
+                arch_stk_setup(nt);
+            }
+
+            /* Create static TLS data if the thread hasn't disabled it. */
+            if(real_attr.disable_tls) {
+                nt->flags |= THD_DISABLE_TLS;
+            } else if(!arch_tls_setup_data(nt)) {
                 if(nt->flags & THD_OWNS_STACK)
                     free(nt->stack);
                 free(nt);
@@ -479,7 +492,7 @@ kthread_t *thd_create_ex(const kthread_attr_t *restrict attr,
 }
 
 kthread_t *thd_create(bool detach, void *(*routine)(void *), void *param) {
-    kthread_attr_t attrs = { detach, 0, NULL, 0, NULL };
+    kthread_attr_t attrs = { detach, 0, NULL, 0, NULL, false };
     return thd_create_ex(&attrs, routine, param);
 }
 
@@ -525,8 +538,9 @@ int thd_destroy(kthread_t *thd) {
     if(thd->flags & THD_OWNS_STACK)
         free(thd->stack);
 
-    /* Free static TLS segment */
-    arch_tls_destroy_data(thd);
+    /* Free static TLS segment (if it hasn't been disabled for the thread). */
+    if(!(thd->flags & THD_DISABLE_TLS))
+        arch_tls_destroy_data(thd);
 
     /* Free the thread */
     free(thd);
@@ -554,14 +568,14 @@ int thd_set_prio(kthread_t *thd, prio_t prio) {
     return 0;
 }
 
-prio_t thd_get_prio(kthread_t *thd) {
+prio_t thd_get_prio(const kthread_t *thd) {
     if(!thd)
         thd = thd_current;
 
     return thd->prio;
 }
 
-tid_t thd_get_id(kthread_t *thd) {
+tid_t thd_get_id(const kthread_t *thd) {
     if(!thd)
         thd = thd_current;
 
@@ -618,11 +632,11 @@ static inline void thd_schedule_inner(kthread_t *thd) {
    to make sure the priorities are all straight before returning, but you
    don't want a full context switch inside the same priority group.
 */
-void thd_schedule(bool front_of_line, uint64_t now) {
+void thd_schedule(bool front_of_line) {
     kthread_t *thd;
+    uint64_t now;
 
-    if(now == 0)
-        now = timer_ms_gettime64();
+    now = timer_ms_gettime64();
 
     /* If there's only two thread left, it's the idle task and the reaper task:
        exit the OS */
@@ -704,12 +718,10 @@ void thd_schedule_next(kthread_t *thd) {
 
 /* See kos/thread.h for description */
 irq_context_t *thd_choose_new(void) {
-    uint64_t now = timer_ms_gettime64();
-
     //printf("thd_choose_new() woken at %d\n", (uint32_t)now);
 
     /* Do any re-scheduling */
-    thd_schedule(0, now);
+    thd_schedule(false);
 
     /* Return the new IRQ context back to the caller */
     return &thd_current->context;
@@ -722,14 +734,11 @@ irq_context_t *thd_choose_new(void) {
    again until our next context switch (if any). For pre-empts, re-schedule
    threads, swap out contexts, and sleep. */
 static void thd_timer_hnd(irq_context_t *context) {
-    /* Get the system time */
-    uint64_t now = timer_ms_gettime64();
-
     (void)context;
 
     //printf("timer woke at %d\n", (uint32_t)now);
 
-    thd_schedule(0, now);
+    thd_schedule(false);
     timer_primary_wakeup(thd_sched_ms);
 }
 
@@ -740,12 +749,7 @@ static void thd_timer_hnd(irq_context_t *context) {
    threads. */
 void thd_sleep(unsigned int ms) {
     /* This should never happen. This should, perhaps, assert. */
-    if(thd_mode == THD_MODE_NONE) {
-        dbglog(DBG_WARNING, "thd_sleep called when threading not "
-               "initialized.\n");
-        timer_spin_sleep(ms);
-        return;
-    }
+    assert(thd_mode != THD_MODE_NONE);
 
     /* A timeout of zero is the same as thd_pass() and passing zero
        down to genwait_wait() causes bad juju. */
@@ -869,7 +873,7 @@ int thd_detach(kthread_t *thd) {
 
 /*****************************************************************************/
 /* Retrieve / set thread label */
-const char *thd_get_label(kthread_t *thd) {
+const char *thd_get_label(const kthread_t *thd) {
     if(!thd)
         thd = thd_current;
 
@@ -889,7 +893,7 @@ kthread_t *thd_get_current(void) {
 }
 
 /* Retrieve / set thread pwd */
-const char *thd_get_pwd(kthread_t *thd) {
+const char *thd_get_pwd(const kthread_t *thd) {
     if(!thd)
         thd = thd_current;
 
@@ -1008,17 +1012,19 @@ int thd_init(void) {
     };
 
     const kthread_attr_t reaper_attr = {
-        .stack_size = sizeof(thd_reaper_stack),
-        .stack_ptr  = thd_reaper_stack,
-        .prio       = 1,
-        .label      = "[reaper]"
+        .stack_size  = sizeof(thd_reaper_stack),
+        .stack_ptr   = thd_reaper_stack,
+        .prio        = 1,
+        .label       = "[reaper]",
+        .disable_tls = true
     };
 
     const kthread_attr_t idle_attr = {
-        .stack_size = sizeof(thd_idle_stack),
-        .stack_ptr  = thd_idle_stack,
-        .prio       = PRIO_MAX,
-        .label      = "[idle]"
+        .stack_size  = sizeof(thd_idle_stack),
+        .stack_ptr   = thd_idle_stack,
+        .prio        = PRIO_MAX,
+        .label       = "[idle]",
+        .disable_tls = true
     };
 
     kthread_t *kern;

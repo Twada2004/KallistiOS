@@ -19,8 +19,10 @@
 #ifndef __DC_NET_BROADBAND_ADAPTER_H
 #define __DC_NET_BROADBAND_ADAPTER_H
 
-#include <sys/cdefs.h>
+#include <kos/cdefs.h>
 __BEGIN_DECLS
+
+#include <arch/types.h>
 
 /** \defgroup bba Broadband Adapter
     \brief    Driver for the Dreamcast's BBA (RTL8139C).

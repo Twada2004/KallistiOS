@@ -27,12 +27,12 @@
     \author Lawrence Sebald
 */
 
-/** \cond **/
-
 #ifndef __PTHREAD_H
 #define __PTHREAD_H
 
-#include <sys/cdefs.h>
+/** \cond **/
+
+#include <kos/cdefs.h>
 #include <sys/features.h>
 #include <sys/_pthreadtypes.h>
 

@@ -36,8 +36,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <arch/arch.h>
-#include <arch/cache.h>
 
 #include <dc/pvr.h>
 #include <dc/maple.h>
@@ -144,8 +142,6 @@ static int setup_pvr(void) {
                     pvr_txr, 
                     PVR_FILTER_BILINEAR);
     pvr_poly_compile(&hdr, &cxt);
-
-    hdr.mode3 |= PVR_TXRFMT_STRIDE;
 
     vert[0].z     = vert[1].z     = vert[2].z     = vert[3].z     = 1.0f; 
     vert[0].argb  = vert[1].argb  = vert[2].argb  = vert[3].argb  = 
@@ -268,7 +264,7 @@ static void __attribute__((__noreturn__)) wait_exit(void) {
 
             if(state)   {
                 if(state->buttons)
-                    arch_exit();
+                    exit(0);
             }
         }
     }

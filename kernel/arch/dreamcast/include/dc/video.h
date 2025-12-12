@@ -24,7 +24,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <sys/cdefs.h>
+#include <kos/cdefs.h>
 __BEGIN_DECLS
 
 /** \defgroup video_display Display
@@ -106,6 +106,12 @@ typedef enum vid_display_mode_generic {
     OR this with the generic mode to get multiple framebuffers instead of one.
 */
 #define DM_MULTIBUFFER  0x2000
+
+/** \brief  Default video mode. */
+#define DEFAULT_VID_MODE    DM_640x480
+
+/** \brief  Default pixel mode for video. */
+#define DEFAULT_PIXEL_MODE  PM_RGB565
 
 /* ------------------------------------------------------------------------- */
 /* More specific modes (and actual indices into the mode table) */
@@ -432,6 +438,16 @@ int vid_screen_shot(const char *destfn);
     \return                 The size of the created image data in bytes, or 0 on failure.
 */
 size_t vid_screen_shot_data(uint8_t **buffer);
+
+/** \brief   Enable or disable dithering.
+    \ingroup video_fb
+
+    This function can be used to enable or disable dithering when a 15-bit or
+    16-bit video mode is used.
+
+    \param  enable          Whether or not dithering should be enabled.
+*/
+void vid_set_dithering(bool enable);
 
 __END_DECLS
 

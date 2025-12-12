@@ -20,7 +20,7 @@
 #include <kos/dbglog.h>
 #include <kos/mutex.h>
 #include <arch/cache.h>
-#include <arch/timer.h>
+#include <kos/timer.h>
 #include <dc/g2bus.h>
 #include <dc/sq.h>
 #include <dc/spu.h>
@@ -218,7 +218,7 @@ static void snd_pcm16_split_unaligned(void *buffer, void *left, void *right, siz
         left_val |= (data & 0xffff0000);
         right_val |= (data & 0xffff) << 16;
 
-        if(((uintptr_t)left_ptr & 31) == 0) {
+        if(__is_aligned(left_ptr, 32)) {
             dcache_alloc_block(left_ptr++, left_val);
             dcache_alloc_block(right_ptr++, right_val);
         }
@@ -237,7 +237,7 @@ static void snd_pcm16_split_unaligned(void *buffer, void *left, void *right, siz
 void snd_pcm16_split_sq(uint32_t *data, uintptr_t left, uintptr_t right, size_t size) {
     g2_ctx_t ctx;
     uint32_t i;
-    uint16 *s = (uint16 *)data;
+    uint16_t *s = (uint16_t *)data;
     size_t remain = size;
     uint32_t *masked_left;
     uint32_t *masked_right;
@@ -308,8 +308,8 @@ void snd_pcm16_split_sq(uint32_t *data, uintptr_t left, uintptr_t right, size_t 
         right += size - remain;
 
         for(; remain >= 4; remain -= 4) {
-            *((vuint16 *)left) = *s++;
-            *((vuint16 *)right) = *s++;
+            *((volatile uint16_t *)left) = *s++;
+            *((volatile uint16_t *)right) = *s++;
             left += 2;
             right += 2;
         }
@@ -743,13 +743,13 @@ static size_t snd_stream_fill(snd_stream_hnd_t hnd, uint32_t offset, size_t size
         if(got_bytes & 3) {
             got_bytes = (got_bytes + 4) & ~3;
         }
-        if(((uintptr_t)data & 31) && sep_buffer[0] == NULL) {
+        if(!__is_aligned(data, 32) && sep_buffer[0] == NULL) {
             spu_memload_sq(left, data, got_bytes);
             return got_bytes;
         }
         mutex_lock(&stream_mutex);
 
-        if((uintptr_t)data & 31) {
+        if(!__is_aligned(data, 32)) {
             memcpy(sep_buffer[0], data, got_bytes);
             data = sep_buffer[0];
         }
@@ -766,7 +766,7 @@ static size_t snd_stream_fill(snd_stream_hnd_t hnd, uint32_t offset, size_t size
     mutex_lock(&stream_mutex);
 
     if(stream->bitsize == 16) {
-        if((uintptr_t)data & 31) {
+        if(!__is_aligned(data, 32)) {
             snd_pcm16_split_unaligned(data, sep_buffer[0], sep_buffer[1], got_bytes);
         }
         else {
@@ -801,6 +801,9 @@ int snd_stream_poll(snd_stream_hnd_t hnd) {
     if(!stream->initted || (!stream->get_data && !stream->req_data)) {
         return -1;
     }
+
+    /* The stream has been initted but not started, so we don't know stereo/mono. */
+    assert(stream->channels != 0);
 
     /* Get channels position */
     current_play_pos = g2_read_32(SPU_RAM_UNCACHED_BASE +

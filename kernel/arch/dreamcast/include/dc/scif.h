@@ -21,7 +21,7 @@
 #ifndef __DC_SCIF_H
 #define __DC_SCIF_H
 
-#include <sys/cdefs.h>
+#include <kos/cdefs.h>
 __BEGIN_DECLS
 
 #include <arch/types.h>
@@ -33,6 +33,12 @@ __BEGIN_DECLS
 
     @{
 */
+
+/** \brief  Default serial bitrate. */
+#define DEFAULT_SERIAL_BAUD 115200
+
+/** \brief  Default serial FIFO behavior. */
+#define DEFAULT_SERIAL_FIFO 1
 
 /** \brief  Set serial parameters.
     \param  baud            The bitrate to set.

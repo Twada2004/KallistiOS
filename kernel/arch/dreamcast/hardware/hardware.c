@@ -19,16 +19,15 @@
 #include <dc/vblank.h>
 
 static int initted = 0;
+static uint32_t sysmode;
 
 #define SYSMODE_REG 0xA05F74B0
 
 int hardware_sys_mode(int *region) {
-    uint32 sm = *((vuint32 *)SYSMODE_REG);
-
     if(region)
-        *region = sm & 0x0F;
+        *region = sysmode & 0x0F;
 
-    return (sm >> 4) & 0x0F;
+    return (sysmode >> 4) & 0x0F;
 }
 
 int hardware_sys_init(void) {
@@ -38,6 +37,7 @@ int hardware_sys_init(void) {
     /* VBlank multiplexer */
     vblank_init();
 
+    sysmode = *((volatile uint32_t *)SYSMODE_REG);
     initted = 1;
 
     return 0;
@@ -66,7 +66,7 @@ int hardware_periph_init(void) {
     spu_init();
     g2_dma_init();
 
-    if (!KOS_PLATFORM_IS_NAOMI) {
+    if(!KOS_PLATFORM_IS_NAOMI) {
         /* Init CD-ROM.. NOTE: NO GD-ROM SUPPORT. ONLY CDs/CDRs. */
         KOS_INIT_FLAG_CALL(cdrom_init);
     }
@@ -77,7 +77,7 @@ int hardware_periph_init(void) {
     /* Init video */
     vid_init(DEFAULT_VID_MODE, DEFAULT_PIXEL_MODE);
 
-    if (!KOS_PLATFORM_IS_NAOMI)
+    if(!KOS_PLATFORM_IS_NAOMI)
         KOS_INIT_FLAG_CALL(bba_la_init);
 
     initted = 2;
@@ -90,10 +90,10 @@ KOS_INIT_FLAG_WEAK(maple_shutdown, true);
 void hardware_shutdown(void) {
     switch(initted) {
         case 2:
-            if (!KOS_PLATFORM_IS_NAOMI)
+            if(!KOS_PLATFORM_IS_NAOMI)
                 KOS_INIT_FLAG_CALL(bba_la_shutdown);
             KOS_INIT_FLAG_CALL(maple_shutdown);
-            if (!KOS_PLATFORM_IS_NAOMI)
+            if(!KOS_PLATFORM_IS_NAOMI)
                 KOS_INIT_FLAG_CALL(cdrom_shutdown);
             g2_dma_shutdown();
             spu_shutdown();

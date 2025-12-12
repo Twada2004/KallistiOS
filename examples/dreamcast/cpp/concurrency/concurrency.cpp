@@ -61,7 +61,7 @@
 #include <exception>
 #include <string>
 
-#include <arch/wdt.h>
+#include <dc/wdt.h>
 
 // 20 seconds in us
 inline constexpr unsigned WATCHDOG_TIMEOUT = (20 * 1000 * 1000);  
@@ -147,7 +147,7 @@ static void test_semaphore() {
 struct LatchJob {
     const std::string name;
     std::string product{"not worked"};
-    std::thread action;
+    std::thread action{std::thread()};
 };
  
 static void test_latch() {

@@ -18,7 +18,7 @@
 #ifndef __DC_SCI_H
 #define __DC_SCI_H
 
-#include <sys/cdefs.h>
+#include <kos/cdefs.h>
 __BEGIN_DECLS
 
 #include <arch/dmac.h>
@@ -146,7 +146,7 @@ void sci_configure_spi(sci_spi_cs_mode_t cs, size_t buffer_size);
 
 /** \brief  Shutdown the SCI port.
 */
-void sci_shutdown();
+void sci_shutdown(void);
 
 /** \brief  Read a single byte from the UART.
     \param  data            Pointer to store the read byte.

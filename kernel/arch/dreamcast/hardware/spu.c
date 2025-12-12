@@ -9,7 +9,7 @@
 #include <dc/spu.h>
 #include <dc/g2bus.h>
 #include <dc/sq.h>
-#include <arch/timer.h>
+#include <kos/timer.h>
 #include <errno.h>
 
 /*
@@ -121,7 +121,7 @@ void spu_memload_dma(uintptr_t dst, void *src_void, size_t length) {
         spu_memload(dst, src_void, length);
         return;
     }
-    if(((uintptr_t)src_void) & 31) {
+    if(!__is_aligned(src_void, 32)) {
         spu_memload_sq(dst, src_void, length);
         return;
     }
@@ -144,7 +144,7 @@ void spu_memload_dma(uintptr_t dst, void *src_void, size_t length) {
             spu_memload_sq(dst, src_void, aligned_len);
         }
         break;
-    } while (1);
+    } while(1);
 
     if(length > 0) {
         /* Make sure the destination is in a non-cached area */
@@ -355,7 +355,7 @@ int spu_init(void) {
     spu_enable();
 
     /* Wait a few clocks */
-    timer_spin_sleep(10);
+    thd_sleep(10);
 
     /* Initialize CDDA channels */
     spu_cdda_init();

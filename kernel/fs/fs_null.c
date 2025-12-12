@@ -10,7 +10,6 @@
 #include <stdint.h>
 #include <errno.h>
 
-#include <arch/types.h>
 #include <kos/mutex.h>
 #include <kos/fs_null.h>
 #include <sys/queue.h>
@@ -105,7 +104,7 @@ static int null_close(void *hnd) {
 static ssize_t null_read(void *hnd, void *buffer, size_t cnt) {
     (void)buffer;
     (void)cnt;
-    
+
     null_fh_t *fh;
 
     /* Check the handle */

@@ -8,8 +8,9 @@
 
 #include <dc/scif.h>
 #include <dc/fs_dcload.h>
-#include <arch/timer.h>
+#include <kos/timer.h>
 #include <kos/dbglog.h>
+#include <kos/regfield.h>
 
 /* SCIF registers */
 #define SCIFREG08(x) *((volatile uint8 *)(x))
@@ -26,12 +27,12 @@
 #define SCLSR2  SCIFREG16(0xffe80024)
 
 /* Values for the SCSPTR2 register */
-#define PTR2_RTSIO  (1 << 7)
-#define PTR2_RTSDT  (1 << 6)
-#define PTR2_CTSIO  (1 << 5)
-#define PTR2_CTSDT  (1 << 4)
-#define PTR2_SPB2IO (1 << 1)
-#define PTR2_SPB2DT (1 << 0)
+#define PTR2_RTSIO  BIT(7)
+#define PTR2_RTSDT  BIT(6)
+#define PTR2_CTSIO  BIT(5)
+#define PTR2_CTSDT  BIT(4)
+#define PTR2_SPB2IO BIT(1)
+#define PTR2_SPB2DT BIT(0)
 
 /* This doesn't seem to actually be necessary on any of the SD cards I've tried,
    but I'm keeping it around, just in case... */
@@ -45,7 +46,7 @@ static uint16 scsptr2 = 0;
 int scif_spi_init(void) {
     /* Make sure we're not using dcload-serial. If we are, then we definitely do
        not have a SPI device on the serial port. */
-    if(*DCLOADMAGICADDR == DCLOADMAGICVALUE && dcload_type == DCLOAD_TYPE_SER) {
+    if(dcload_type == DCLOAD_TYPE_SER) {
         dbglog(DBG_KDEBUG, "scif_spi_init: no spi device -- using "
                "dcload-serial\n");
         return -1;

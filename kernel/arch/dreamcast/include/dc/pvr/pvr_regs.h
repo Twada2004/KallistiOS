@@ -3,7 +3,7 @@
    dc/pvr/pvr_regs.h
    Copyright (C) 2002 Megan Potter
    Copyright (C) 2014 Lawrence Sebald
-   Copyright (C) 2023 Ruslan Rostovtsev
+   Copyright (C) 2023, 2025 Ruslan Rostovtsev
    Copyright (C) 2024 Falco Girgis
 */
 
@@ -27,8 +27,10 @@
 #ifndef __DC_PVR_PVR_REGS_H
 #define __DC_PVR_PVR_REGS_H
 
-#include <sys/cdefs.h>
+#include <kos/cdefs.h>
 __BEGIN_DECLS
+
+#include <arch/arch.h>
 
 /**** Register macros ***************************************************/
 
@@ -173,7 +175,8 @@ __BEGIN_DECLS
 #define PVR_RAM_BASE        0xa5000000  /**< \brief VRAM 32-bit, P2 area, PVR->VRAM */
 #define PVR_RAM_INT_BASE    0xa4000000  /**< \brief VRAM 64-bit, P2 area, PVR->VRAM */
 
-#define PVR_RAM_SIZE        (8*1024*1024)   /**< \brief RAM size in bytes */
+#define PVR_RAM_SIZE_MB     (hardware_sys_mode(NULL) == HW_TYPE_RETAIL ? 8 : 16)  /**< \brief RAM size in MiB */
+#define PVR_RAM_SIZE        (PVR_RAM_SIZE_MB*1024*1024)         /**< \brief RAM size in bytes */
 
 #define PVR_RAM_TOP         (PVR_RAM_BASE + PVR_RAM_SIZE)       /**< \brief Top of raw PVR RAM */
 #define PVR_RAM_INT_TOP     (PVR_RAM_INT_BASE + PVR_RAM_SIZE)   /**< \brief Top of int PVR RAM */
@@ -207,6 +210,23 @@ __BEGIN_DECLS
 #define PVR_TA_INIT_GO      0x80000000  /**< \brief Write to the PVR_TA_INIT register to confirm settings */
 /** @} */
 
+/** \defgroup pvr_tex_mod   PVR_TEXTURE_MODULO Values
+    \brief                  Definitions for the contents of the PVR_TEXTURE_MODULO register.
+    \ingroup                pvr_registers
+    @{
+*/
+#define PVR_TXR_STRIDE_MULT GENMASK(4, 0)   /**< \brief Bottom 5 bits contain the size when using PVR_TXRFMT_X32_STRIDE */
+/** @} */
+
+/** \defgroup pvr_scaler    PVR_SCALER_CFG Values
+    \brief                  Definitions for the fields of the PVR_SCALER_CFG register.
+    \ingroup                pvr_registers
+    @{
+*/
+#define PVR_SCALER_CFG_FSAA BIT(16)  /**< \brief Enable FSAA */
+
+#define PVR_SCALER_CFG_VSCALE_FACTOR GENMASK(15, 0) /**< \brief Vertical scale factor = 1024 / value */
+/** @} */
 
 __END_DECLS
 

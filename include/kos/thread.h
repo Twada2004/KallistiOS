@@ -4,7 +4,7 @@
    Copyright (C) 2000, 2001, 2002, 2003 Megan Potter
    Copyright (C) 2009, 2010, 2016, 2023 Lawrence Sebald
    Copyright (C) 2023 Colton Pawielski
-   Copyright (C) 2023, 2024 Falco Girgis
+   Copyright (C) 2023, 2024, 2025 Falco Girgis
 
 */
 
@@ -19,7 +19,6 @@
     \see    kos/genwait.h
     \see    kos/mutex.h
     \see    kos/once.h
-    \see    kos/recursive_lock.h
     \see    kos/rwsem.h
     \see    kos/sem.h
     \see    kos/tls.h
@@ -36,13 +35,14 @@
 #ifndef __KOS_THREAD_H
 #define __KOS_THREAD_H
 
-#include <sys/cdefs.h>
+#include <kos/cdefs.h>
 __BEGIN_DECLS
 
 #include <kos/cdefs.h>
 #include <kos/tls.h>
 #include <arch/irq.h>
 #include <arch/types.h>
+
 #include <sys/queue.h>
 #include <sys/reent.h>
 
@@ -128,11 +128,12 @@ LIST_HEAD(ktlist, kthread);
 
     @{
 */
-#define THD_DEFAULTS    0  /**< \brief Defaults: no flags */
-#define THD_USER        1  /**< \brief Thread runs in user mode */
-#define THD_QUEUED      2  /**< \brief Thread is in the run queue */
-#define THD_DETACHED    4  /**< \brief Thread is detached */
-#define THD_OWNS_STACK  8  /**< \brief Thread manages stack lifetime */
+#define THD_DEFAULTS    0x0  /**< \brief Defaults: no flags */
+#define THD_USER        0x1  /**< \brief Thread runs in user mode */
+#define THD_QUEUED      0x2  /**< \brief Thread is in the run queue */
+#define THD_DETACHED    0x4  /**< \brief Thread is detached */
+#define THD_OWNS_STACK  0x8  /**< \brief Thread manages stack lifetime */
+#define THD_DISABLE_TLS 0x10 /**< \brief Thread does not use TLS variables */
 /** @} */
 
 /** \brief Kernel thread flags type */
@@ -150,7 +151,9 @@ typedef enum kthread_state {
     STATE_FINISHED = 0x0004   /**< \brief Finished execution */
 } kthread_state_t;
 
-
+/* Thread and priority types */
+typedef int tid_t;            /**< \brief Thread ID type */
+typedef int prio_t;           /**< \brief Priority value type */
 
 /** \brief   Structure describing one running thread.
 
@@ -289,6 +292,9 @@ typedef struct kthread_attr {
 
     /** \brief  Thread label. */
     const char *label;
+
+    /** \brief 1 if the thread doesn't use thread_local variables. */
+    bool disable_tls;
 } kthread_attr_t;
 
 /** \brief  kthread mode values
@@ -456,14 +462,13 @@ void thd_exit(void *rv) __noreturn;
     time for checking timeouts.
 
     \param  front_of_line   Set to false, unless you have a good reason not to.
-    \param  now             Set to 0, unless you have a good reason not to.
 
     \sa thd_schedule_next
     \warning                Never call this function from outside of an
                             interrupt context! Doing so will almost certainly
                             end very poorly.
 */
-void thd_schedule(bool front_of_line, uint64_t now);
+void thd_schedule(bool front_of_line);
 
 /** \brief       Force a given thread to the front of the queue.
     \relatesalso kthread_t
@@ -526,7 +531,7 @@ int thd_set_prio(kthread_t *thd, prio_t prio);
 
     \sa thd_set_prio
 */
-prio_t thd_get_prio(kthread_t *thd);
+prio_t thd_get_prio(const kthread_t *thd);
 
 /** \brief       Retrieve a thread's numeric identifier.
     \relatesalso kthread_t
@@ -536,7 +541,7 @@ prio_t thd_get_prio(kthread_t *thd);
 
     \return                 The identifier of the thread
 */
-tid_t thd_get_id(kthread_t *thd);
+tid_t thd_get_id(const kthread_t *thd);
 
 /** \brief       Retrieve the current thread's kthread struct.
     \relatesalso kthread_t
@@ -554,7 +559,7 @@ kthread_t *thd_get_current(void);
 
     \sa thd_set_label
 */
-const char *thd_get_label(kthread_t *thd);
+const char *thd_get_label(const kthread_t *thd);
 
 /** \brief       Set the thread's label.
     \relatesalso kthread_t
@@ -585,7 +590,7 @@ void thd_set_label(kthread_t *__RESTRICT thd, const char *__RESTRICT label);
 
     \sa thd_set_pd
 */
-const char *thd_get_pwd(kthread_t *thd);
+const char *thd_get_pwd(const kthread_t *thd);
 
 /** \brief       Set the thread's current working directory.
     \relatesalso kthread_t

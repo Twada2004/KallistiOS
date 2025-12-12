@@ -36,7 +36,7 @@
 #ifndef __DC_PVR_H
 #define __DC_PVR_H
 
-#include <sys/cdefs.h>
+#include <kos/cdefs.h>
 __BEGIN_DECLS
 
 #include <stdalign.h>
@@ -329,7 +329,7 @@ typedef struct {
 /** \defgroup pvr_txr_switch        Toggle
     \brief                          Enable or Disable Texturing on Polygons.
     \ingroup                        pvr_ctx_texture
-    
+
     @{
 */
 #define PVR_TEXTURE_DISABLE     0   /**< \brief Disable texturing */
@@ -344,7 +344,7 @@ typedef struct {
 /** \defgroup pvr_blend_switch      Blending Toggle
     \brief                          Enable or Disable Blending.
     \ingroup                        pvr_blend
-    
+
     @{
 */
 #define PVR_BLEND_DISABLE       0   /**< \brief Disable blending */
@@ -508,8 +508,12 @@ typedef struct {
 #define PVR_TXRFMT_PAL8BPP      (6 << 27)   /**< \brief 8BPP paletted format */
 #define PVR_TXRFMT_TWIDDLED     (0 << 26)   /**< \brief Texture is twiddled */
 #define PVR_TXRFMT_NONTWIDDLED  (1 << 26)   /**< \brief Texture is not twiddled */
-#define PVR_TXRFMT_NOSTRIDE     (0 << 21)   /**< \brief Texture is not strided */
-#define PVR_TXRFMT_STRIDE       (1 << 21)   /**< \brief Texture is strided */
+#define PVR_TXRFMT_POW2_STRIDE  (0 << 25)   /**< \brief Stride is a power-of-two */
+#define PVR_TXRFMT_X32_STRIDE   (1 << 25)   /**< \brief Stride is multiple of 32 */
+
+/* Compat. */
+static const uint32_t PVR_TXRFMT_NOSTRIDE   __depr("Please use PVR_TXRFMT_POW2_STRIDE.") = PVR_TXRFMT_POW2_STRIDE;
+static const uint32_t PVR_TXRFMT_STRIDE     __depr("Please use PVR_TXRFMT_X32_STRIDE. Note this may cause breakage as PVR_TXRFMT_STRIDE was never working correctly." ) = PVR_TXRFMT_X32_STRIDE;
 
 /* OR one of these into your texture format if you need it. Note that
    these coincide with the twiddled/stride bits, so you can't have a
@@ -655,8 +659,16 @@ typedef struct pvr_vertex {
     float   x;                   /**< \brief X coordinate */
     float   y;                   /**< \brief Y coordinate */
     float   z;                   /**< \brief Z coordinate */
-    float   u;                   /**< \brief Texture U coordinate */
-    float   v;                   /**< \brief Texture V coordinate */
+    union {
+        struct {
+            float u;             /**< \brief Texture U coordinate */
+            float v;             /**< \brief Texture V coordinate */
+        };
+        struct {
+            uint32_t argb0;      /**< \brief Vertex color when modified, outside area */
+            uint32_t argb1;      /**< \brief Vertex color when modified, inside area */
+        };
+    };
     uint32_t argb;               /**< \brief Vertex color */
     uint32_t oargb;              /**< \brief Vertex offset color */
 } pvr_vertex_t;
@@ -948,12 +960,12 @@ Striplength set to 2 */
 /** @} */
 
 /* Initialization ****************************************************/
-/** \defgroup pvr_init  Initialization 
+/** \defgroup pvr_init  Initialization
     \brief              Driver initialization and shutdown
     \ingroup            pvr
 
     Initialization and shutdown: stuff you should only ever have to do
-    once in your program. 
+    once in your program.
 */
 
 /** \defgroup pvr_binsizes          Primitive Bin Sizes
@@ -1017,7 +1029,7 @@ typedef struct {
 
         Preallocates this many extra OPBs (sets of tile bins), allowing the PVR
         to use the extra space when there's too much geometry in the first OPB.
-    
+
         Increasing this value can eliminate artifacts where pieces of geometry
         flicker in and out of existence along the tile boundaries. */
 
@@ -1114,7 +1126,7 @@ int pvr_shutdown(void);
     Another somewhat subtle point that bears mentioning is that in the normal
     case (interrupts enabled) an interrupt handler will automatically take
     care of starting a frame rendering (after scene_finish()) and also
-    flipping pages when appropriate. 
+    flipping pages when appropriate.
 */
 
 /** \defgroup  pvr_vertex_dma   Vertex DMA
@@ -1124,7 +1136,7 @@ int pvr_shutdown(void);
 
 /** \brief   Is vertex DMA enabled?
     \ingroup pvr_vertex_dma
-    
+
     \return                 Non-zero if vertex DMA was enabled at init time
 */
 int pvr_vertex_dma_enabled(void);
@@ -1133,7 +1145,7 @@ int pvr_vertex_dma_enabled(void);
     \ingroup pvr_list_mgmt
 
     If the specified list type already has a vertex buffer, it will be replaced
-    by the new one. 
+    by the new one.
 
     \note
     Each buffer should actually be twice as long as what you will need to hold
@@ -1149,7 +1161,7 @@ int pvr_vertex_dma_enabled(void);
     \param  len             The length of the buffer. This must be a multiple of
                             64, and must be at least 128 (even if you're not
                             using the list).
-    
+
     \return                 The old buffer location (if any)
 */
 void *pvr_set_vertbuf(pvr_list_t list, void *buffer, size_t len);
@@ -1163,7 +1175,7 @@ void *pvr_set_vertbuf(pvr_list_t list, void *buffer, size_t len);
     pvr_vertbuf_written() to notify the system of any such changes.
 
     \param  list            The primitive list to get the buffer for.
-    
+
     \return                 The tail of that list's buffer.
 */
 void *pvr_vertbuf_tail(pvr_list_t list);
@@ -1226,7 +1238,7 @@ void pvr_scene_begin_txr(pvr_ptr_t txr, uint32_t *rx, uint32_t *ry);
     \retval 0               On success.
     \retval -1              If the specified list has already been closed.
 */
-int pvr_list_begin(pvr_list_t list);            
+int pvr_list_begin(pvr_list_t list);
 
 /** \brief   End collecting data for the current list type.
     \ingroup pvr_list_mgmt
@@ -1261,7 +1273,7 @@ int pvr_list_finish(void);
     \param  data            The primitive to submit.
     \param  size            The length of the primitive, in bytes. Must be a
                             multiple of 32.
-    
+
     \retval 0               On success.
     \retval -1              On error.
 */
@@ -1290,7 +1302,7 @@ void pvr_dr_init(pvr_dr_state_t *vtx_buf_ptr);
     \param  vtx_buf_ptr     State variable for Direct Rendering. Should be of
                             type pvr_dr_state_t, and must have been initialized
                             previously in the scene with pvr_dr_init().
-    
+
     \return                 A write-only destination address where a primitive
                             should be written to get ready to submit it to the
                             TA in DR mode.
@@ -1338,7 +1350,7 @@ void pvr_send_to_ta(void *data);
     \param  data            The primitive to submit.
     \param  size            The size of the primitive in bytes. This must be a
                             multiple of 32.
-    
+
     \retval 0               On success.
     \retval -1              On error.
 */
@@ -1352,7 +1364,7 @@ int pvr_list_prim(pvr_list_t list, const void *data, size_t size);
     both direct and DMA TA submission is possible.
 
     \param  list            The list to flush.
-    
+
     \retval -1              On error (it is not possible to succeed).
 */
 int pvr_list_flush(pvr_list_t list);
@@ -1598,6 +1610,20 @@ void pvr_poly_cxt_txr_mod(pvr_poly_cxt_t *dst, pvr_list_t list,
     \return                 A pointer to the front buffer.
 */
 pvr_ptr_t pvr_get_front_buffer(void);
+
+/** \brief   Get a pointer to the back buffer.
+    \ingroup pvr_txr_mgmt
+
+    This function can be used to retrieve a pointer to the back buffer, aka.
+    the frame buffer that will be rendered to.
+
+    Note that the frame buffers lie in 32-bit memory, while textures lie in
+    64-bit memory. The address returned will point to 64-bit memory, but the
+    back buffer cannot be used directly as a regular texture.
+
+    \return                 A pointer to the back buffer.
+*/
+pvr_ptr_t pvr_get_back_buffer(void);
 
 /*********************************************************************/
 

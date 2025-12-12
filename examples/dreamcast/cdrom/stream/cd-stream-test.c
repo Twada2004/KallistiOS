@@ -17,7 +17,6 @@
 #include <dc/maple/controller.h>
 #include <dc/cdrom.h>
 
-#include <arch/arch.h>
 #include <arch/cache.h>
 
 #include <kos/init.h>
@@ -43,7 +42,7 @@ static void __attribute__((__noreturn__)) wait_exit(void) {
 
             if(state)   {
                 if(state->buttons)
-                    arch_exit();
+                    exit(0);
             }
         }
     }
@@ -60,7 +59,7 @@ static int cd_stream_test(uint32_t lba, uint8_t *buffer, size_t size, int mode) 
     size_t cb_count = 0;
     char *stream_name = (mode == CDROM_READ_PIO ? "PIO" : "DMA");
 
-    dbglog(DBG_DEBUG, "Start %s stream.\n", stream_name);
+    dbglog(DBG_INFO, "Start %s stream.\n", stream_name);
     rs = cdrom_stream_start(lba, size / 2048, mode);
 
     if (rs != ERR_OK) {
@@ -112,12 +111,12 @@ static int cd_stream_test(uint32_t lba, uint8_t *buffer, size_t size, int mode) 
         return -1;
     }
 
-    dbglog(DBG_DEBUG, "%s transfer is done.\n", stream_name);
+    dbglog(DBG_INFO, "%s transfer is done.\n", stream_name);
     return 0;
 }
 
-int print_diff(uint8_t *pio_buf, uint8_t *dma_buf, size_t size) {
-    int i, j, rv = 0;
+size_t print_diff(uint8_t *pio_buf, uint8_t *dma_buf, size_t size) {
+    size_t i, j, rv = 0;
 
     for(i = 0; i < size; ++i) {
         if (dma_buf[i] != pio_buf[i]) {
@@ -143,7 +142,8 @@ int print_diff(uint8_t *pio_buf, uint8_t *dma_buf, size_t size) {
 }
 
 int main(int argc, char *argv[]) {
-    int rs, i;
+    int rs;
+    size_t i;
     uint32_t lba;
     CDROM_TOC toc;
 

@@ -26,7 +26,7 @@ fi
 
 # Our includes.
 export KOS_INC_PATHS="${KOS_INC_PATHS} -I${KOS_BASE}/include \
--I${KOS_BASE}/kernel/arch/${KOS_ARCH}/include -I${KOS_BASE}/addons/include \
+-I${KOS_BASE}/kernel/arch/${KOS_ARCH}/include -I${KOS_BASE}/addons/include/ -I${KOS_BASE}/addons/include/${KOS_ARCH} \
 -I${KOS_PORTS}/include"
 
 # "System" libraries.
@@ -60,18 +60,4 @@ export KOS_CPPSTD="-std=gnu++17"
 
 export KOS_GCCVER="`kos-cc -dumpversion`"
 
-case $KOS_GCCVER in
-  2* | 3*)
-    echo "Your GCC version is too old. You probably will run into major problems!"
-    export KOS_LDFLAGS="${KOS_CFLAGS} ${KOS_LDFLAGS} -nostartfiles -nostdlib ${KOS_LIB_PATHS}" ;;
-  *)
-    export KOS_LDFLAGS="${KOS_CFLAGS} ${KOS_LDFLAGS} ${KOS_LD_SCRIPT} -nodefaultlibs ${KOS_LIB_PATHS}" ;;
-esac
-
-# Some extra vars based on architecture.
-case $KOS_GCCVER in
-  2* | 3*)
-    export KOS_START="${KOS_ARCH_DIR}/kernel/startup.o" ;;
-  *)
-    export KOS_START="" ;;
-esac
+export KOS_LDFLAGS="${KOS_CFLAGS} ${KOS_LDFLAGS} ${KOS_LD_SCRIPT} -nostdlib ${KOS_LIB_PATHS}"

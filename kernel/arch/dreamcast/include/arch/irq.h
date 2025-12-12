@@ -1,9 +1,9 @@
 /* KallistiOS ##version##
 
    arch/dreamcast/include/arch/irq.h
-   Copyright (C) 2000-2001 Megan Potter
+   Copyright (C) 2000, 2001 Megan Potter
    Copyright (C) 2024 Paul Cercueil
-   Copyright (C) 2024 Falco Girgis
+   Copyright (C) 2024, 2025 Falco Girgis
 
 */
 
@@ -29,7 +29,7 @@
 #include <stdalign.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <sys/cdefs.h>
+#include <kos/cdefs.h>
 __BEGIN_DECLS
 
 /** \defgroup irqs  Interrupts
@@ -263,27 +263,6 @@ typedef enum irq_exception {
     EXC_UNHANDLED_EXC      = 0x07e0  /**< `[SOFT  ]` Exception went unhandled */
 } irq_t;
 
-
-/** \defgroup  irq_type_offsets        Exception type offsets
-    \brief                             Offsets within exception types
-    \ingroup                           irqs
-
-    The following are a table of "type offsets" (see the Hitachi PDF). These are
-    the 0x000, 0x100, 0x400, and 0x600 offsets.
-
-    @{
-*/
-#define EXC_OFFSET_000  0   /**< \brief Offset 0x000 */
-#define EXC_OFFSET_100  1   /**< \brief Offset 0x100 */
-#define EXC_OFFSET_400  2   /**< \brief Offset 0x400 */
-#define EXC_OFFSET_600  3   /**< \brief Offset 0x600 */
-/** @} */
-
-/** \brief   The value of the timer IRQ
-    \ingroup irqs
-*/
-#define TIMER_IRQ       EXC_TMU0_TUNI0
-
 /** \defgroup irq_state     State
     \brief                  Methods for querying active IRQ information.
 
@@ -329,7 +308,25 @@ typedef uint32_t irq_mask_t;
     \retval                 Status register word
     \sa irq_disable()
 */
-irq_mask_t irq_get_sr(void);
+static inline irq_mask_t irq_get_sr(void) {
+    irq_mask_t value;
+    __asm__ volatile("stc sr, %0" : "=r" (value));
+    return value;
+}
+
+/** Restore IRQ state.
+
+    This function will restore the interrupt state to the value specified. This
+    should correspond to a value returned by irq_disable().
+
+    \param  v               The IRQ state to restore. This should be a value
+                            returned by irq_disable().
+
+    \sa irq_disable()
+*/
+static inline void irq_restore(irq_mask_t old) {
+    __asm__ volatile("ldc %0, sr" : : "r" (old));
+}
 
 /** Disable interrupts.
 
@@ -342,7 +339,11 @@ irq_mask_t irq_get_sr(void);
 
     \sa irq_restore(), irq_enable()
 */
-irq_mask_t irq_disable(void);
+static inline irq_mask_t irq_disable(void) {
+    uint32_t mask = (uint32_t)irq_get_sr();
+    irq_restore((mask & 0xefffff0f) | 0x000000f0);
+    return mask;
+}
 
 /** Enable all interrupts.
 
@@ -350,19 +351,10 @@ irq_mask_t irq_disable(void);
 
     \sa irq_disable()
 */
-void irq_enable(void);
-
-/** Restore IRQ state.
-
-    This function will restore the interrupt state to the value specified. This
-    should correspond to a value returned by irq_disable().
-
-    \param  v               The IRQ state to restore. This should be a value
-                            returned by irq_disable().
-
-    \sa irq_disable()
-*/
-void irq_restore(irq_mask_t v);
+static inline void irq_enable(void) {
+    uint32_t mask = ((uint32_t)irq_get_sr() & 0xefffff0f);
+    irq_restore(mask);
+}
 
 /** \brief  Disable interrupts with scope management.
 
@@ -433,14 +425,14 @@ typedef struct irq_cb {
 */
 
 /** Set or remove an IRQ handler.
-    
+
     Passing a NULL value for hnd will remove the current handler, if any.
 
     \param  code            The IRQ type to set the handler for
                             (see #irq_t).
     \param  hnd             A pointer to a procedure to handle the exception.
     \param  data            A pointer that will be passed along to the callback.
-    
+
     \retval 0               On success.
     \retval -1              If the code is invalid.
 

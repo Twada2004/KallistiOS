@@ -25,9 +25,33 @@
 #include <dc/math.h>
 #include <dc/biosfont.h>
 #include <dc/vmufs.h>
-#include <arch/timer.h>
+#include <kos/timer.h>
 
 #define VMU_BLOCK_WRITE_RETRY_TIME  100     /* time to sleep until retrying a failed write */
+
+/* This is the value that official VMUs report for function_data[0]. Have not 
+   found any official ones that report a different value nor any third party
+   that report it.
+*/
+static const uint32_t vmu_official_function_data0 = 0x403f7e7e;
+
+/* Distinguish between VMU (only official, with screen/clock/buttons)
+   and VMS (memcard only). */
+static bool vmu_is_vmu(const maple_device_t *dev) {
+    /* If it doesn't have the known magic number, it's no official VMU. */
+    if(dev->info.function_data[0] != vmu_official_function_data0)
+        return false;
+
+    /* Give a secondary test to confirm that it's presenting all three
+    components of an official VMU. This alone is not sufficient to test
+    for VMU vs VMS though as most (all?) 3rd party VMS report that they
+    have the other functions.
+    */
+    if(dev->info.functions & (MAPLE_FUNC_MEMCARD | MAPLE_FUNC_LCD | MAPLE_FUNC_CLOCK))
+        return true;
+
+    return false;
+}
 
 /* VMU's raw condition data: 0 = PRESSED, 1 = RELEASED */
 typedef struct vmu_cond {
@@ -127,8 +151,9 @@ static void vmu_poll_reply(maple_state_t *st, maple_frame_t *frm) {
 static int vmu_poll(maple_device_t *dev) {
     uint32_t *send_buf;
 
-    /* Only query for button input on the front VMU of each controller. */
-    if(dev->unit == 1) {
+    /* Only query for button input on the front VMU of each controller 
+       AND the device actually has the functionality. */
+    if((dev->unit == 1) && vmu_is_vmu(dev)) {
         if(maple_frame_lock(&dev->frame) < 0)
             return 0;
 
@@ -177,7 +202,7 @@ void vmu_set_buttons_enabled(int enable) {
 }
 
 /* Determine whether polling for button input is enabled or not by presence of periodic callback. */
-int vmu_get_buttons_enabled(void) { 
+int vmu_get_buttons_enabled(void) {
     return !!vmu_drv.periodic;
 }
 
@@ -249,7 +274,7 @@ int vmu_set_custom_color(maple_device_t *dev, uint8_t red, uint8_t green, uint8_
 int vmu_set_icon_shape(maple_device_t *dev, uint8_t icon_shape) {
     vmu_root_t root;
 
-    if (KOS_PLATFORM_IS_NAOMI)
+    if(KOS_PLATFORM_IS_NAOMI)
         return -1;
 
     if(icon_shape < BFONT_ICON_VMUICON || icon_shape > BFONT_ICON_EMBROIDERY)
@@ -292,6 +317,10 @@ int vmu_beep_raw(maple_device_t *dev, uint32_t beep) {
 
     assert(dev);
 
+    /* Only send a beep if this is a real VMU */
+    if(!vmu_is_vmu(dev))
+        return MAPLE_EINVALID;
+
     /* Lock the frame */
     if(maple_frame_lock(&dev->frame) < 0)
         return MAPLE_EAGAIN;
@@ -305,20 +334,9 @@ int vmu_beep_raw(maple_device_t *dev, uint32_t beep) {
     dev->frame.dst_port = dev->port;
     dev->frame.dst_unit = dev->unit;
     dev->frame.length = 2;
-    dev->frame.callback = vmu_gen_callback;
+    dev->frame.callback = NULL;
     dev->frame.send_buf = send_buf;
     maple_queue_frame(&dev->frame);
-
-    /* Wait for the timer to accept it */
-    if(genwait_wait(&dev->frame, "vmu_beep_raw", 500, NULL) < 0) {
-        if(dev->frame.state != MAPLE_FRAME_VACANT) {
-            /* Something went wrong.... */
-            dev->frame.state = MAPLE_FRAME_VACANT;
-            dbglog(DBG_ERROR, "vmu_beep_raw: timeout to unit %c%c, beep: %lu\n",
-                   dev->port + 'A', dev->unit + '0', beep);
-            return MAPLE_ETIMEOUT;
-        }
-    }
 
     return MAPLE_EOK;
 }
@@ -337,6 +355,10 @@ int vmu_draw_lcd(maple_device_t *dev, const void *bitmap) {
 
     assert(dev != NULL);
 
+    /* Only try to draw to screen if this is a real VMU */
+    if(!vmu_is_vmu(dev))
+        return MAPLE_EINVALID;
+
     /* Lock the frame */
     if(maple_frame_lock(&dev->frame) < 0)
         return MAPLE_EAGAIN;
@@ -351,20 +373,9 @@ int vmu_draw_lcd(maple_device_t *dev, const void *bitmap) {
     dev->frame.dst_port = dev->port;
     dev->frame.dst_unit = dev->unit;
     dev->frame.length = 2 + VMU_SCREEN_WIDTH;
-    dev->frame.callback = vmu_gen_callback;
+    dev->frame.callback = NULL;
     dev->frame.send_buf = send_buf;
     maple_queue_frame(&dev->frame);
-
-    /* Wait for the LCD to accept it */
-    if(genwait_wait(&dev->frame, "vmu_draw_lcd", 500, NULL) < 0) {
-        if(dev->frame.state != MAPLE_FRAME_VACANT) {
-            /* It's probably never coming back, so just unlock the frame */
-            dev->frame.state = MAPLE_FRAME_VACANT;
-            dbglog(DBG_ERROR, "vmu_draw_lcd: timeout to unit %c%c\n",
-                   dev->port + 'A', dev->unit + '0');
-            return MAPLE_ETIMEOUT;
-        }
-    }
 
     return MAPLE_EOK;
 }
@@ -373,7 +384,7 @@ int vmu_draw_lcd_rotated(maple_device_t *dev, const void *bitmap) {
     uint32_t bitmap_inverted[48];
     unsigned int i;
 
-    for (i = 0; i < 48; i++) {
+    for(i = 0; i < 48; i++) {
         bitmap_inverted[i] = bit_reverse(((uint32 *)bitmap)[47 - i]);
     }
 
@@ -640,6 +651,10 @@ int vmu_set_datetime(maple_device_t *dev, time_t unix) {
 
     assert(dev);
 
+    /* Only set datetime if this is a real VMU */
+    if(!vmu_is_vmu(dev))
+        return MAPLE_EINVALID;
+
     btime = localtime(&unix);
     assert(btime); /* A failure here means an invalid unix timestamp was given. */
 
@@ -689,6 +704,10 @@ int vmu_get_datetime(maple_device_t *dev, time_t *unix) {
     uint32_t          *send_buf;
 
     assert(dev);
+
+    /* Only get datetime if this is a real VMU */
+    if(!vmu_is_vmu(dev))
+        return MAPLE_EINVALID;
 
     /* Lock the frame */
     if(maple_frame_lock(&dev->frame) < 0)
